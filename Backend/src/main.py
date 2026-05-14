@@ -1,22 +1,22 @@
-import pandas as pd
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-df = pd.read_csv(
-    "src/data/processed/final.csv"
+from src.api.api_routes import router
+
+app = FastAPI()
+
+# Enable frontend access
+app.add_middleware(
+    CORSMiddleware,
+
+    allow_origins=["*"],
+
+    allow_credentials=True,
+
+    allow_methods=["*"],
+
+    allow_headers=["*"],
 )
 
-nasa_df = df[[
-    "City",
-    "Latitude",
-    "Longitude",
-    "Date",
-    "Temperature",
-    "Rainfall",
-    "Humidity"
-]]
-
-nasa_df.to_csv(
-    "src/data/processed/recovered_nasa_weather_data.csv",
-    index=False
-)
-
-print("NASA dataset recovered")
+# Register routes
+app.include_router(router)
