@@ -1,17 +1,36 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Virtual env
 venv/
 env/
 .venv/
+Backend/venv/
 
 # Cache
 .ipynb_checkpoints/
 
 # Environment variables
 .env
+.env.*
+!.env.example
+
+# Node.js
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Ignore huge datasets
 Backend/src/data/raw/
@@ -24,3 +43,7 @@ Backend/src/data/processed/
 
 # VS Code
 .vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

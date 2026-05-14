@@ -13,8 +13,8 @@ from src.services.anomaly_service import (
 )
 
 # Coordinates
-lat = 28.61
-lon = 77.20
+lat = 11.00
+lon = 76.96
 
 # Generate cell
 cell_id = get_cell_id(lat, lon)

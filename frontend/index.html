@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paruvam AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="layout">
+
+        <!-- LEFT — Map -->
+        <div class="map-side">
+            <div id="map"></div>
+            <div class="map-hint">💡 Click anywhere on the map to analyze</div>
+        </div>
+
+        <!-- RIGHT — Panel -->
+        <div class="panel-side">
+
+            <div class="search-box">
+                <h2>🌍 Paruvam AI</h2>
+                <p class="subtitle">Climate Anomaly Detection</p>
+                <div class="search-row">
+                    <input type="text" id="locationInput" placeholder="Search city or enter lat, lon">
+                    <button onclick="handleSearch()">Search</button>
+                </div>
+                <div class="quick-cities">
+                    <span>Quick:</span>
+                    <button onclick="searchCity('Chennai')">Chennai</button>
+                    <button onclick="searchCity('Delhi')">Delhi</button>
+                    <button onclick="searchCity('Hyderabad')">Hyderabad</button>
+                    <button onclick="searchCity('Chandigarh')">Chandigarh</button>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="results" class="results" style="display: none;">
+                <div class="results-top">
+                    <span id="locationLabel" class="location-label">—</span>
+                    <button class="close-btn" onclick="closeResults()">✕</button>
+                </div>
+
+                <div class="risk-card" id="riskCard">
+                    <div><small>RISK LEVEL</small><h1 id="riskLevel">—</h1></div>
+                    <div style="text-align:right"><small>Anomaly Score</small><span class="score" id="anomalyScore">—</span></div>
+                </div>
+
+                <div id="alertsBox" style="display:none">
+                    <h3>🚨 Alerts</h3>
+                    <div id="alertsList"></div>
+                </div>
+
+                <h3>🌡️ Live Data</h3>
+                <div class="data-grid">
+                    <div class="data-card"><div class="card-label">Temperature</div><div class="card-value" id="tempVal">—</div><div class="card-sigma" id="tempSigma"></div></div>
+                    <div class="data-card"><div class="card-label">Humidity</div><div class="card-value" id="humidityVal">—</div><div class="card-sigma" id="humiditySigma"></div></div>
+                    <div class="data-card"><div class="card-label">Rainfall</div><div class="card-value" id="rainfallVal">—</div><div class="card-sigma" id="rainfallSigma"></div></div>
+                    <div class="data-card"><div class="card-label">PM 2.5</div><div class="card-value" id="pm25Val">—</div><div class="card-sigma" id="pm25Sigma"></div></div>
+                    <div class="data-card"><div class="card-label">PM 10</div><div class="card-value" id="pm10Val">—</div><div class="card-sigma" id="pm10Sigma"></div></div>
+                    <div class="data-card"><div class="card-label">US AQI</div><div class="card-value" id="aqiVal">—</div><div class="card-sigma" id="aqiSigma"></div></div>
+                </div>
+
+                <div class="risk-details-box">
+                    <button id="riskDetailsBtn" class="risk-details-btn" onclick="toggleRiskDetails()">View Risk Details</button>
+                    <div id="riskDetailsPanel" class="risk-details-panel" style="display:none">
+                        <h3>Possible Risk Factors</h3>
+                        <div id="riskSummary" class="risk-summary">No data yet.</div>
+
+                        <h3>Main Factors</h3>
+                        <div id="riskFactorsList" class="risk-factors-list"></div>
+
+                        <h3>Cautions</h3>
+                        <div id="riskCautionsList" class="risk-cautions-list"></div>
+
+                        <h3>More Details</h3>
+                        <div id="riskMeta" class="risk-meta"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="emptyState" class="empty-state">
+                <h3>Select a Location</h3>
+                <p>Search a city name or click on the map to analyze</p>
+                <!-- <p style="font-size:0.75em; color:#bbb; margin-top:12px">Works for: Punjab, Tamil Nadu, Telangana, Puducherry</p> -->
+            </div>
+        </div>
+    </div>
+
+    <div id="loader" class="loader" style="display:none">
+        <div class="loader-box"><div class="spinner"></div><p>Analyzing...</p></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

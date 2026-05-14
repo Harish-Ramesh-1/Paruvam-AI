@@ -55,16 +55,18 @@ def analyze_location(lat: float, lon: float):
             "lat": lat,
             "lon": lon
         },
-
         "cell_id": cell_id,
-
         "live_data": live_data,
-
         "normalized_data": normalized_data,
-
         "anomaly_result": anomaly_result,
-
+        "temperature": live_data["Temperature"],
+        "humidity": live_data["Humidity"],
+        "aqi": live_data["us_aqi"],
         "risk_level": severity["level"],
-
-        "color": severity["color"]
+        "color": severity["color"],
+        "anomaly_detected": anomaly_result["anomaly"] == -1,
+        "anomaly_score": round(
+            anomaly_result["anomaly_score"],
+            3
+        )
     }
