@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# Cache
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+
+# Ignore huge datasets
+Backend/src/data/raw/
+Backend/src/data/processed/
+
+# Ignore huge generated files
+*.zip
+*.tar
+*.gz
+
+# VS Code
+.vscode/
