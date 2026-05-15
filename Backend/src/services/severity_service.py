@@ -6,19 +6,19 @@ def get_risk_level(anomaly_score):
             "color": "green"
         }
 
-    elif anomaly_score > -0.05:
+    elif anomaly_score > 0.02:
         return {
             "level": "LOW",
             "color": "yellow"
         }
 
-    elif anomaly_score > -0.15:
+    elif anomaly_score > -0.04:
         return {
             "level": "HIGH",
             "color": "orange"
         }
 
-    elif anomaly_score > -0.30:
+    elif anomaly_score > -0.12:
         return {
             "level": "VERY HIGH",
             "color": "red"

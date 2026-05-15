@@ -65,19 +65,10 @@
                 </div>
 
                 <div class="risk-details-box">
-                    <button id="riskDetailsBtn" class="risk-details-btn" onclick="toggleRiskDetails()">View Risk Details</button>
+                    <button id="riskDetailsBtn" class="risk-details-btn" onclick="handleRiskDetailsButton()">View Risk Details</button>
                     <div id="riskDetailsPanel" class="risk-details-panel" style="display:none">
-                        <h3>Possible Risk Factors</h3>
-                        <div id="riskSummary" class="risk-summary">No data yet.</div>
-
-                        <h3>Main Factors</h3>
-                        <div id="riskFactorsList" class="risk-factors-list"></div>
-
-                        <h3>Cautions</h3>
-                        <div id="riskCautionsList" class="risk-cautions-list"></div>
-
-                        <h3>More Details</h3>
-                        <div id="riskMeta" class="risk-meta"></div>
+                        <h3>Report</h3>
+                        <div id="riskDetailsReport" class="details-report"></div>
                     </div>
                 </div>
             </div>

@@ -2,6 +2,9 @@
 
 var API_URL = "http://127.0.0.1:8000";
 var map, markers = [];
+var lastAnalysis = null;
+var detailsRequestInFlight = false;
+var emptyStateDefaultHtml = null;
 
 var riskColors = {
     "NORMAL": "#22c55e", "LOW": "#eab308", "HIGH": "#f97316",
@@ -11,6 +14,7 @@ var riskColors = {
 
 // ── Initialize Map ──
 window.addEventListener("DOMContentLoaded", function () {
+    emptyStateDefaultHtml = document.getElementById("emptyState").innerHTML;
     map = L.map("map").setView([20.5, 78.9], 5);
 
     // Google Maps-style tiles (English labels)
@@ -90,19 +94,50 @@ async function analyzeLocation(lat, lon) {
         if (!response.ok) throw new Error("Backend error " + response.status);
         var data = await response.json();
 
+        if (data.service_available === false) {
+            lastAnalysis = null;
+            showComingSoon(data.service_message);
+            return;
+        }
+
+        lastAnalysis = {
+            lat: lat,
+            lon: lon,
+            data: data
+        };
+
         showResults(data);
         addMarker(data);
         map.setView([lat, lon], 10);
     } catch (err) {
         alert("Cannot connect to backend!\n\nStart backend:\n  cd Backend\n  uvicorn src.main:app --reload\n\n" + err.message);
+    } finally {
+        document.getElementById("loader").style.display = "none";
     }
-
-    document.getElementById("loader").style.display = "none";
 }
 
 
 // ── Show Results ──
+function restoreEmptyState() {
+    if (emptyStateDefaultHtml !== null) {
+        document.getElementById("emptyState").innerHTML = emptyStateDefaultHtml;
+    }
+}
+
+
+function showComingSoon(message) {
+    markers.forEach(function (m) { map.removeLayer(m); });
+    markers = [];
+    document.getElementById("results").style.display = "none";
+    var emptyState = document.getElementById("emptyState");
+    emptyState.style.display = "flex";
+    emptyState.innerHTML = '<div><h3>Our service is coming soon</h3><p>' + escapeHtml(message || "This location is outside our current coverage.") + '</p></div>';
+    resetRiskDetailsPanel();
+}
+
+
 function showResults(data) {
+    restoreEmptyState();
     document.getElementById("emptyState").style.display = "none";
     document.getElementById("results").style.display = "block";
 
@@ -116,7 +151,7 @@ function showResults(data) {
 
     showAlerts(data);
     showDataCards(data);
-    renderRiskDetails(data);
+    resetRiskDetailsPanel();
 }
 
 
@@ -171,93 +206,107 @@ function showDataCards(data) {
 }
 
 
-function riskBand(sigma) {
-    var a = Math.abs(sigma);
-    if (a >= 2) return "critical";
-    if (a >= 1.5) return "watch";
-    if (a >= 1) return "mild";
-    return "normal";
+function resetRiskDetailsPanel() {
+    document.getElementById("riskDetailsPanel").style.display = "none";
+    document.getElementById("riskDetailsBtn").textContent = "View Risk Details";
+    document.getElementById("riskDetailsReport").innerHTML = "";
 }
 
 
-function cautionForFactor(name, sigma) {
-    var high = sigma > 0;
-    if (name === "Temperature") return high
-        ? "Limit outdoor exertion in peak hours, hydrate frequently, and monitor vulnerable groups."
-        : "Watch for sudden cold stress and keep indoor spaces stable for sensitive people.";
-    if (name === "Humidity") return high
-        ? "High humidity can worsen heat stress; improve airflow and reduce prolonged exposure."
-        : "Low humidity can irritate eyes/airways; consider hydration and humidification indoors.";
-    if (name === "Rainfall") return high
-        ? "Check for localized waterlogging and transport disruption risk before travel."
-        : "Low rainfall may increase dryness and dust movement; track air quality closely.";
-    if (name === "PM2.5" || name === "PM10") return high
-        ? "Sensitive groups should reduce outdoor activity and use proper masks when needed."
-        : "Particulate levels are below usual baseline; continue routine monitoring.";
-    if (name === "US AQI") return high
-        ? "Elevated AQI suggests poorer air; reduce outdoor intensity and keep medication ready."
-        : "AQI is currently below baseline risk; maintain normal precautions.";
-    return "Continue monitoring this factor for rapid local changes.";
+function handleRiskDetailsButton() {
+    var panel = document.getElementById("riskDetailsPanel");
+    if (panel.style.display === "block") {
+        resetRiskDetailsPanel();
+        return;
+    }
+
+    fetchRiskDetails();
 }
 
 
-function renderRiskDetails(data) {
-    var featureMap = [
-        { key: "Temperature_norm", name: "Temperature", unit: "°C", live: data.live_data.Temperature },
-        { key: "Humidity_norm", name: "Humidity", unit: "%", live: data.live_data.Humidity },
-        { key: "Rainfall_norm", name: "Rainfall", unit: "mm", live: data.live_data.Rainfall },
-        { key: "pm2_5_norm", name: "PM2.5", unit: "", live: data.live_data.pm2_5 },
-        { key: "pm10_norm", name: "PM10", unit: "", live: data.live_data.pm10 },
-        { key: "us_aqi_norm", name: "US AQI", unit: "", live: data.live_data.us_aqi }
-    ];
-
-    var factors = featureMap.map(function (f) {
-        var sigma = data.normalized_data[f.key];
-        return {
-            name: f.name,
-            sigma: sigma,
-            absSigma: Math.abs(sigma),
-            direction: sigma >= 0 ? "above" : "below",
-            live: f.live,
-            unit: f.unit,
-            band: riskBand(sigma)
-        };
-    }).sort(function (a, b) {
-        return b.absSigma - a.absSigma;
+function parseReport(report) {
+    var lines = (report || "").split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+    return lines.map(function (line) {
+        return line.replace(/^\d+\.\s*/, "");
     });
+}
 
-    var top = factors.slice(0, 3);
-    var summary = document.getElementById("riskSummary");
-    summary.textContent = "Primary influence from " + top.map(function (f) { return f.name; }).join(", ") + ". Higher absolute sigma implies greater deviation from local baseline.";
 
-    var factorsHtml = top.map(function (f) {
-        var trend = f.direction === "above" ? "above baseline" : "below baseline";
-        var severity = f.band === "critical" ? "Critical" : f.band === "watch" ? "Watch" : f.band === "mild" ? "Mild" : "Normal";
-        return '<div class="risk-factor-item">'
-            + '<div class="risk-factor-head"><strong>' + f.name + '</strong><span class="risk-tag ' + f.band + '">' + severity + '</span></div>'
-            + '<div class="risk-factor-body">Live: ' + f.live + f.unit + ' | Deviation: ' + (f.sigma >= 0 ? '+' : '') + f.sigma.toFixed(2) + 'σ (' + trend + ')</div>'
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+
+function renderReportSections(report, riskLevel) {
+    var lines = parseReport(report);
+    var prettyRisk = escapeHtml(riskLevel || "UNKNOWN");
+    var sections = lines.map(function (line, index) {
+        var parts = line.split(/:\s*/);
+        var title = parts.shift() || "Detail";
+        var body = parts.join(": ") || line;
+        return '<div class="report-section report-section-' + (index + 1) + '">'
+            + '<div class="report-section-head">'
+            + '<span class="report-step">' + String(index + 1).padStart(2, "0") + '</span>'
+            + '<span class="report-title">' + escapeHtml(title) + '</span>'
+            + '</div>'
+            + '<div class="report-section-body">' + escapeHtml(body) + '</div>'
             + '</div>';
     }).join("");
-    document.getElementById("riskFactorsList").innerHTML = factorsHtml;
 
-    var cautionTargets = factors.filter(function (f) { return f.absSigma >= 1; }).slice(0, 4);
-    if (cautionTargets.length === 0) cautionTargets = top.slice(0, 2);
-    var cautionsHtml = cautionTargets.map(function (f) {
-        return '<div class="risk-caution-item">• <strong>' + f.name + ':</strong> ' + cautionForFactor(f.name, f.sigma) + '</div>';
-    }).join("");
-    document.getElementById("riskCautionsList").innerHTML = cautionsHtml;
+    return '<div class="report-shell report-shell-' + prettyRisk.toLowerCase().replace(/[^a-z0-9]+/g, "-") + '">'
+        + '<div class="report-shell-top">'
+        + '<div>'
+        + '<div class="report-heading">Environmental Risk Report</div>'
+        + '</div>'
+        + '<span class="report-chip">' + prettyRisk + '</span>'
+        + '</div>'
+        + '<div class="report-sections">' + sections + '</div>'
+        + '</div>';
+}
 
-    var anomalyType = data.anomaly_result.anomaly === -1 ? "Anomalous pattern detected" : "No anomaly pattern detected";
-    document.getElementById("riskMeta").innerHTML =
-        '<div><strong>Model status:</strong> ' + anomalyType + '</div>'
-        + '<div><strong>Anomaly score:</strong> ' + data.anomaly_result.anomaly_score.toFixed(4) + '</div>'
-        + '<div><strong>Cell reference:</strong> ' + data.cell_id + '</div>'
-        + '<div><strong>Interpretation note:</strong> Risk is estimated from relative deviation (sigma), not absolute health diagnosis.</div>';
 
-    var panel = document.getElementById("riskDetailsPanel");
+async function fetchRiskDetails() {
+    if (!lastAnalysis || detailsRequestInFlight) return;
+
     var btn = document.getElementById("riskDetailsBtn");
-    panel.style.display = "none";
-    btn.textContent = "View Risk Details";
+    var panel = document.getElementById("riskDetailsPanel");
+    var reportBox = document.getElementById("riskDetailsReport");
+
+    detailsRequestInFlight = true;
+    panel.style.display = "block";
+    btn.textContent = "Loading Risk Details...";
+    btn.disabled = true;
+
+    reportBox.innerHTML = '<div class="details-report-line">Loading backend report...</div>';
+
+    try {
+        var response = await fetch(API_URL + "/details?lat=" + lastAnalysis.lat + "&lon=" + lastAnalysis.lon);
+        if (!response.ok) throw new Error("Backend error " + response.status);
+        var details = await response.json();
+
+        if (details.service_available === false) {
+            reportBox.innerHTML = '<div class="details-report-empty">' + escapeHtml(details.service_message || "Our service is coming soon for this location.") + '</div>';
+            btn.textContent = "View Risk Details";
+            return;
+        }
+
+        reportBox.innerHTML = details.report
+            ? renderReportSections(details.report, details.risk_level)
+            : '<div class="details-report-empty">No report text returned by the backend.</div>';
+
+        btn.textContent = "Hide Risk Details";
+    } catch (err) {
+        reportBox.innerHTML = '<div class="details-report-empty">Check the backend server and your Gemini API key if the report is unavailable.</div>';
+        btn.textContent = "View Risk Details";
+    } finally {
+        btn.disabled = false;
+        detailsRequestInFlight = false;
+    }
 }
 
 
@@ -285,9 +334,10 @@ function addMarker(data) {
 // ── Close ──
 function closeResults() {
     document.getElementById("results").style.display = "none";
-    document.getElementById("emptyState").style.display = "flex";
-    document.getElementById("riskDetailsPanel").style.display = "none";
-    document.getElementById("riskDetailsBtn").textContent = "View Risk Details";
+    var emptyState = document.getElementById("emptyState");
+    emptyState.style.display = "flex";
+    restoreEmptyState();
+    resetRiskDetailsPanel();
     markers.forEach(function (m) { map.removeLayer(m); });
     markers = [];
 }

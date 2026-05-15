@@ -5,6 +5,10 @@ regional_stats = pd.read_csv(
     "src/data/processed/regional_baselines.csv"
 )
 
+# Maximum allowed fallback distance
+MAX_DISTANCE = 25
+COMING_SOON_MESSAGE = "Our service is coming soon for this location."
+
 
 def normalize_live_data(cell_id, live_data):
 
@@ -13,8 +17,12 @@ def normalize_live_data(cell_id, live_data):
         regional_stats["cell_id"] == cell_id
     ]
 
-    # Fallback to nearest cell if missing
+    used_fallback = False
+
+    # If exact cell not found
     if region.empty:
+
+        used_fallback = True
 
         # Split target cell
         target_lat, target_lon = map(
@@ -22,7 +30,7 @@ def normalize_live_data(cell_id, live_data):
             cell_id.split("_")
         )
 
-        # Create temporary distance column
+        # Calculate distance from all cells
         regional_stats["distance"] = (
             (
                 regional_stats["cell_id"]
@@ -42,11 +50,25 @@ def normalize_live_data(cell_id, live_data):
         )
 
         # Find nearest available region
-        region = regional_stats.sort_values(
+        nearest_region = regional_stats.sort_values(
             "distance"
-        ).iloc[[0]]
+        ).iloc[0]
 
-    # Convert single-row dataframe → series
+        nearest_distance = nearest_region[
+            "distance"
+        ]
+
+        # Reject if location too far
+        if nearest_distance > MAX_DISTANCE:
+
+            raise ValueError(
+                COMING_SOON_MESSAGE
+            )
+
+        # Use nearest region
+        region = pd.DataFrame([nearest_region])
+
+    # Convert dataframe row → series
     region = region.iloc[0]
 
     normalized_data = {}
@@ -71,11 +93,15 @@ def normalize_live_data(cell_id, live_data):
 
         else:
             normalized_value = (
-                (live_data[feature] - mean) / std
+                (live_data[feature] - mean)
+                / std
             )
 
         normalized_data[
             f"{feature}_norm"
         ] = float(normalized_value)
 
-    return normalized_data
+    return {
+        "normalized_data": normalized_data,
+        "used_fallback": used_fallback
+    }
